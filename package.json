@@ -1,0 +1,21 @@
+{
+  "name": "window-cover-costa",
+  "version": "1.0.0",
+  "description": "Window Cover Costa website",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build step required for static site'",
+    "start": "npx serve"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "keywords": [
+    "window",
+    "covering",
+    "blinds",
+    "curtains"
+  ],
+  "author": "",
+  "license": "ISC"
+}
