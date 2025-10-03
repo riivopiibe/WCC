@@ -1,34 +1,57 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Determine the root directory of the website
-// PyWebCopy typically downloads content to a directory structure like domain/path
-const rootDir = path.join(__dirname, 'windows-cover.webflow.io');
+// Directory containing the mirrored site
+const siteDir = path.join(__dirname, 'windows-cover.webflow.io');
 
-// Serve static files from the website directory
-app.use(express.static(rootDir));
+// 1) Serve top-level static assets (e.g. /cdn.prod.website-files.com, /ajax.googleapis.com, etc.)
+//    These are referenced with ../ from pages inside siteDir
+app.use(express.static(__dirname));
 
-// For any routes not found in static files, serve the index.html
-app.get('*', (req, res) => {
-  // Try to serve index.html first
-  res.sendFile(path.join(rootDir, 'index.html'), err => {
-    if (err) {
-      // If index.html doesn't exist, send a helpful message
-      res.status(404).send(`
-        <h1>Website Setup</h1>
-        <p>The PyWebCopy download seems to have a different structure than expected.</p>
-        <p>Available files in the root directory:</p>
-        <ul>
-          ${require('fs').readdirSync(rootDir).map(file => `<li>${file}</li>`).join('')}
-        </ul>
-      `);
-    }
+// 2) Serve the mirrored site pages and their assets
+app.use(express.static(siteDir));
+
+// 3) Support extensionless clean URLs:
+//    /about-us -> /windows-cover.webflow.io/about-us.html
+//    /estonian/avaleht -> /windows-cover.webflow.io/estonian/avaleht.html
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const hasExt = path.extname(req.path) !== '';
+  if (hasExt) return next();
+
+  // Try to resolve to an .html file under the site directory
+  const candidate = path.join(siteDir, req.path.replace(/\/$/, '')) + '.html';
+  fs.access(candidate, fs.constants.F_OK, err => {
+    if (err) return next();
+    res.sendFile(candidate);
   });
+});
+
+// 4) Root route -> serve the site's index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(siteDir, 'index.html'));
+});
+
+// 5) Fallback: if nothing matched, show a helpful listing for debugging
+app.use((req, res) => {
+  try {
+    const files = fs.readdirSync(siteDir).map(f => `<li>${f}</li>`).join('');
+    res.status(404).send(`
+      <h1>Not Found</h1>
+      <p>The requested path could not be resolved to a file.</p>
+      <p>Try using paths like "/about-us" or include the .html extension.</p>
+      <p>Available files in the site directory:</p>
+      <ul>${files}</ul>
+    `);
+  } catch (e) {
+    res.status(404).send('Not Found');
+  }
 });
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}/`);
-  console.log(`Serving content from: ${rootDir}`);
+  console.log(`Serving site from: ${siteDir}`);
 });
